@@ -42,7 +42,7 @@ Os documentos devem ser entregues em formato Markdown.
 A entrega é puramente documental: você não deve mexer no código da aplicação (src/, prisma/, tests/, configurações). O código serve de contexto e referência.
 
 Ordem de execução sugerida
-Fork e setup: faça o fork do repositório base: já feito e presente em: C:\_aulasMBA\mba-ia-desafio-design-docs-com-ia
+Fork e setup: faça o fork do repositório base: já feito e presente em: C:\_aulasMBA\Documentos_Gerados_Por_IA\mba-ia-desafio-design-docs-com-ia
 Contextualização com IA: forneça à IA acesso ao código (via Claude Code, Cursor lendo o repo, ou colando trechos relevantes) e à transcrição. Peça uma exploração inicial para entender estrutura, padrões e o que a feature precisa endereçar.
 ADRs primeiro: identifique e produza as decisões principais antes dos demais documentos. As decisões formam o esqueleto do "como implementar".
 RFC: consolide a proposta técnica em cima das decisões. As alternativas descartadas e as questões em aberto da reunião têm lugar natural aqui. Referencie os ADRs já escritos.

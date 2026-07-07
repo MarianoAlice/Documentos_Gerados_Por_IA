@@ -61,5 +61,5 @@ Estrutura obrigatória do entregável
 
 A entrega deve ser feita como repositório público no GitHub: já estamos na pasta da entrega.
 
-Repositório base: C:\_aulasMBA\mba-ia-desafio-design-docs-com-ia
+Repositório base: C:\_aulasMBA\Documentos_Gerados_Por_IA\mba-ia-desafio-design-docs-com-ia
 O repositório base do desafio contém a aplicação completa, a transcrição e a estrutura de pastas pra você preencher:
