@@ -1,6 +1,6 @@
 # Achados — Order Management System (OMS)
 
-**Projeto analisado:** `C:\_aulasMBA\Documentos_Gerados_Por_IA\mba-ia-desafio-design-docs-com-ia`  
+**Projeto analisado:** `mba-ia-desafio-design-docs-com-ia`  
 **Data da análise:** 07/07/2026  
 **Propósito deste documento:** servir como referência de arquitetura e funcionalidades para qualquer alteração futura na aplicação.
 
@@ -567,4 +567,4 @@ Esta seção mapeia onde integrar novas funcionalidades, com base no contexto do
 
 ---
 
-*Documento gerado a partir da análise do código-fonte em `C:\_aulasMBA\Documentos_Gerados_Por_IA\mba-ia-desafio-design-docs-com-ia`. Para alterações na aplicação, consulte os arquivos referenciados diretamente no repositório.*
+*Documento gerado a partir da análise do código-fonte em `mba-ia-desafio-design-docs-com-ia`. Para alterações na aplicação, consulte os arquivos referenciados diretamente no repositório.*

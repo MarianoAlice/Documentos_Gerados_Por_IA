@@ -140,7 +140,7 @@ Conforme padrão em `src/app.ts` e `src/routes/index.ts`:
 | Autorização ADMIN | `src/middlewares/auth.middleware.ts` → `requireRole('ADMIN')` |
 | Composição da app | `src/app.ts`, `src/routes/index.ts` |
 
-**Repositório analisado:** `C:\_aulasMBA\Documentos_Gerados_Por_IA\mba-ia-desafio-design-docs-com-ia`
+**Repositório analisado:** `C:\_aulasMBA\mba-ia-desafio-design-docs-com-ia`
 
 ---
 

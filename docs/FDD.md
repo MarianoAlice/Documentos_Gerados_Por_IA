@@ -14,19 +14,19 @@ Este documento detalha **como implementar** a proposta do RFC. Decisões arquite
 
 O OMS persiste mudanças de status em transação Prisma via `OrderService.changeStatus()` (`src/modules/orders/order.service.ts`). Hoje a transação:
 
-1. Valida transição (`canTransition` em `order.status.ts`)
+1. Valida transição (`canTransition` em `src/modules/orders/order.status.ts`)
 2. Ajusta estoque (`shouldDebitStock` / `shouldReplenishStock`)
 3. Atualiza `orders.status`
 4. Insere em `order_status_history`
 
 Não existe camada de eventos ou notificações externas. Esta feature adiciona, sem alterar o contrato de `/orders`:
 
-| Componente novo | ADR |
-|-----------------|-----|
-| Tabelas Prisma (config, outbox, DLQ, deliveries) | ADR-001, ADR-003, ADR-007 |
-| Módulo `src/modules/webhooks/` | ADR-006 |
-| Worker `src/worker.ts` | ADR-002 |
-| Hook transacional em `changeStatus()` | ADR-001, ADR-007 |
+| Componente (**a criar**) | ADR |
+|--------------------------|-----|
+| Tabelas Prisma (config, outbox, DLQ, deliveries) — alterar `prisma/schema.prisma` | ADR-001, ADR-003, ADR-007 |
+| Módulo `src/modules/webhooks/` (pasta e arquivos novos) | ADR-006 |
+| Worker `src/worker.ts` (arquivo novo) | ADR-002 |
+| Hook transacional em `changeStatus()` — **alterar** `src/modules/orders/order.service.ts` | ADR-001, ADR-007 |
 | HMAC-SHA256 e headers outbound | ADR-004, ADR-005 |
 
 ---
@@ -50,8 +50,8 @@ Não existe camada de eventos ou notificações externas. Esta feature adiciona,
 - Modelagem Prisma (4 entidades)
 - CRUD de webhooks + rotação de secret + histórico de entregas + replay DLQ
 - Worker com polling, HMAC, retry
-- Testes de integração em `tests/webhooks.test.ts`
-- Script `npm run worker`
+- Testes de integração em `tests/webhooks.test.ts` (**a criar**)
+- Script `npm run worker` (**a adicionar** em `package.json`)
 
 ### Exclusões (conforme RFC)
 
@@ -64,7 +64,7 @@ E-mail de alerta, dashboard visual, rate limiting, arquivamento 30 dias, múltip
 ### Fluxo 1 — Cadastro de webhook
 
 ```
-Cliente                    API (webhook.routes)              DB
+Cliente                    API (webhook.routes — a criar)    DB
   │ POST /webhooks           │                                │
   │─────────────────────────►│ authenticate                   │
   │                          │ validate() — Zod HTTPS         │
@@ -84,7 +84,7 @@ Ponto de integração crítico: `OrderService.changeStatus()` — ver seção [I
 OrderService.changeStatus()  —  prisma.$transaction(async (tx) => { ... })
   │
   ├─► findUnique order + items
-  ├─► canTransition(from, to)          ← order.status.ts
+  ├─► canTransition(from, to)          ← src/modules/orders/order.status.ts
   ├─► debitStock / replenishStock      ← se aplicável
   ├─► tx.order.update({ status: to })
   ├─► tx.orderStatusHistory.create(...)
@@ -96,7 +96,7 @@ OrderService.changeStatus()  —  prisma.$transaction(async (tx) => { ... })
   └─► COMMIT  (ou ROLLBACK se qualquer passo falhar)
 ```
 
-Função em `src/modules/webhooks/webhook.publisher.ts`:
+Função **a criar** em `src/modules/webhooks/webhook.publisher.ts`:
 
 ```typescript
 export async function publishWebhookEvent(
@@ -109,7 +109,7 @@ export async function publishWebhookEvent(
 
 ### Fluxo 3 — Processamento pelo worker
 
-Entry point: `src/worker.ts` → `WebhookProcessor` em `src/modules/webhooks/webhook.processor.ts`.
+Entry point **a criar:** `src/worker.ts` → `WebhookProcessor` **a criar** em `src/modules/webhooks/webhook.processor.ts`.
 
 ```
 Loop a cada 2s ([ADR-002]):
@@ -361,8 +361,8 @@ Cliente deduplica por `event_id` / `X-Event-Id` ([ADR-005](adrs/ADR-005-at-least
 
 ## Matriz de erros previstos
 
-| Código | HTTP | Classe sugerida | Quando |
-|--------|------|-----------------|--------|
+| Código | HTTP | Classe sugerida (**a criar**) | Quando |
+|--------|------|-------------------------------|--------|
 | `WEBHOOK_NOT_FOUND` | 404 | `WebhookNotFoundError` | Webhook id inexistente |
 | `WEBHOOK_INVALID_URL` | 400 | `WebhookInvalidUrlError` | URL não HTTPS ou malformada (Zod) |
 | `WEBHOOK_SECRET_REQUIRED` | 400 | `WebhookSecretRequiredError` | Operação exige secret ausente |
@@ -372,9 +372,9 @@ Cliente deduplica por `event_id` / `X-Event-Id` ([ADR-005](adrs/ADR-005-at-least
 | `WEBHOOK_CUSTOMER_NOT_FOUND` | 404 | `WebhookCustomerNotFoundError` | `customerId` inválido no cadastro |
 | `WEBHOOK_INACTIVE` | 422 | `WebhookInactiveError` | Entrega em webhook desativado |
 
-Erros reutilizados do sistema: `UNAUTHORIZED` (401), `FORBIDDEN` (403), `VALIDATION_ERROR` (400).
+Erros reutilizados do sistema (já existentes): `UNAUTHORIZED` (401), `FORBIDDEN` (403), `VALIDATION_ERROR` (400).
 
-**Implementação:** classes em `src/shared/errors/http-errors.ts`, export em `src/shared/errors/index.ts`. O `errorMiddleware` (`src/middlewares/error.middleware.ts`) trata qualquer `AppError` sem alteração — mesmo padrão de `InsufficientStockError` e `InvalidStatusTransitionError`.
+**Implementação:** adicionar classes `Webhook*` em `src/shared/errors/http-errors.ts` (**alterar**), exportar em `src/shared/errors/index.ts` (**alterar**). O `errorMiddleware` em `src/middlewares/error.middleware.ts` (existente) trata qualquer `AppError` sem alteração — mesmo padrão de `InsufficientStockError` e `InvalidStatusTransitionError`.
 
 ---
 
@@ -450,8 +450,8 @@ Propagar `X-Request-Id` do `requestLogger` (`src/middlewares/request-logger.midd
 - [ ] 5 retries com intervalos 1m/5m/30m/2h/12h antes de DLQ
 - [ ] Replay DLQ retorna `403` para `OPERATOR`
 - [ ] Payload snapshot sem `items`; rejeição se > 64 KB
-- [ ] URL `http://` rejeitada no schema Zod de `webhook.schemas.ts`
-- [ ] Testes em `tests/webhooks.test.ts` passando
+- [ ] URL `http://` rejeitada no schema Zod de `src/modules/webhooks/webhook.schemas.ts` (**a criar**)
+- [ ] Testes em `tests/webhooks.test.ts` (**a criar**) passando
 
 ---
 
@@ -469,16 +469,18 @@ Propagar `X-Request-Id` do `requestLogger` (`src/middlewares/request-logger.midd
 
 ## Integração com o sistema existente
 
-Esta seção mapeia **onde e como** o módulo de webhooks se conecta ao código atual do OMS. Cada entrada referencia um arquivo real do repositório base (`mba-ia-desafio-design-docs-com-ia`).
+Esta seção mapeia **onde e como** o módulo de webhooks se conecta ao código do OMS. Cada entrada indica explicitamente se o arquivo **já existe** (reutilizar ou alterar) ou **a criar** (ainda não presente no repositório).
 
-### 1. `src/modules/orders/order.service.ts` — enfileiramento transacional
+**Legenda:** **Existente** = arquivo no repo hoje · **Alterar** = arquivo existe, recebe mudanças · **A criar** = arquivo novo nesta feature
 
-**Estado atual:** `changeStatus()` executa `this.prisma.$transaction(async (tx) => { ... })` com validação de transição, estoque, update de `orders` e insert em `order_status_history` (linhas 131–178).
+### 1. `src/modules/orders/order.service.ts` — enfileiramento transacional (**Alterar**)
 
-**Alteração:** após `tx.orderStatusHistory.create(...)` e **antes** do `findUnique` final, inserir:
+**Estado atual (existente):** `changeStatus()` executa `this.prisma.$transaction(async (tx) => { ... })` com validação de transição, estoque, update de `orders` e insert em `order_status_history` (linhas 131–178).
+
+**Alteração:** após `tx.orderStatusHistory.create(...)` e **antes** do `findUnique` final, inserir chamada à função **a criar** em `src/modules/webhooks/webhook.publisher.ts`:
 
 ```typescript
-import { publishWebhookEvent } from '../webhooks/webhook.publisher.js';
+import { publishWebhookEvent } from '../webhooks/webhook.publisher.js'; // módulo a criar
 
 // dentro da $transaction, após orderStatusHistory.create:
 await publishWebhookEvent(tx, order, from, to);
@@ -488,9 +490,9 @@ await publishWebhookEvent(tx, order, from, to);
 - Usar o objeto `order` já carregado no início da transação (contém `customerId`, `orderNumber`, `totalCents`)
 - Não injetar `WebhookRepository` no `OrderService` — apenas a função pura com `tx` ([ADR-001](adrs/ADR-001-outbox-no-mysql.md))
 - Falha em `publishWebhookEvent` → rollback automático da transação Prisma
-- **Não alterar** assinatura pública de `changeStatus(id, input, userId)` nem o contrato HTTP em `order.routes.ts`
+- **Não alterar** assinatura pública de `changeStatus(id, input, userId)` nem o contrato HTTP em `src/modules/orders/order.routes.ts` (existente)
 
-### 2. `src/modules/orders/order.status.ts` — gatilho de eventos
+### 2. `src/modules/orders/order.status.ts` — gatilho de eventos (**Existente** — somente leitura)
 
 **Estado atual:** exporta `canTransition()`, `shouldDebitStock()`, `shouldReplenishStock()` e mapa de transições (`PENDING→PAID`, etc.).
 
@@ -498,15 +500,15 @@ await publishWebhookEvent(tx, order, from, to);
 
 **Implicação:** criação de pedido (`POST /orders`, status inicial `PENDING`) **não** gera webhook — apenas transições via `PATCH /orders/:id/status`.
 
-### 3. `src/app.ts` e `src/routes/index.ts` — composição e rotas
+### 3. `src/app.ts` e `src/routes/index.ts` — composição e rotas (**Alterar**)
 
-**Estado atual:** `buildControllers(prisma)` instancia repositories → services → controllers manualmente; `buildApiRouter(controllers)` monta rotas em `/api/v1`.
+**Estado atual (existente):** `buildControllers(prisma)` instancia repositories → services → controllers manualmente; `buildApiRouter(controllers)` monta rotas em `/api/v1`.
 
-**Alteração em `src/app.ts`:**
+**Alteração em `src/app.ts`:** importar e registrar módulo webhooks (**a criar**):
 ```typescript
-import { WebhookRepository } from './modules/webhooks/webhook.repository.js';
-import { WebhookService } from './modules/webhooks/webhook.service.js';
-import { WebhookController } from './modules/webhooks/webhook.controller.js';
+import { WebhookRepository } from './modules/webhooks/webhook.repository.js';   // a criar
+import { WebhookService } from './modules/webhooks/webhook.service.js';         // a criar
+import { WebhookController } from './modules/webhooks/webhook.controller.js'; // a criar
 
 // em buildControllers():
 const webhookRepository = new WebhookRepository(prisma);
@@ -519,17 +521,18 @@ return {
 };
 ```
 
-**Alteração em `src/routes/index.ts`:** estender tipo `Controllers` e registrar:
+**Alteração em `src/routes/index.ts`:** estender tipo `Controllers` e registrar rotas (**funções a criar** em `webhook.routes.ts`):
 ```typescript
-import { buildWebhookRoutes } from '../modules/webhooks/webhook.routes.js';
+import { buildWebhookRouter } from '../modules/webhooks/webhook.routes.js';           // a criar
+import { buildAdminWebhookRouter } from '../modules/webhooks/webhook.routes.js';      // a criar
 
-router.use('/webhooks', buildWebhookRoutes(controllers.webhooks));
-router.use('/admin/webhooks', buildAdminWebhookRoutes(controllers.webhooks));
+router.use('/webhooks', buildWebhookRouter(controllers.webhooks));
+router.use('/admin/webhooks', buildAdminWebhookRouter(controllers.webhooks));
 ```
 
-Segue o mesmo padrão de `buildOrderRoutes`, `buildCustomerRoutes`, etc.
+Segue o mesmo padrão dos módulos existentes: `buildOrderRouter`, `buildCustomerRouter`, `buildProductRouter`, etc. (definidos em `src/modules/*/*.routes.ts`).
 
-### 4. `src/middlewares/auth.middleware.ts` — autorização
+### 4. `src/middlewares/auth.middleware.ts` — autorização (**Existente** — reutilizar)
 
 **Estado atual:** `authenticate` valida JWT e popula `req.user`; `requireRole(...)` restringe por role (usado hoje em `src/modules/users/user.routes.ts` para `ADMIN`).
 
@@ -542,32 +545,32 @@ Segue o mesmo padrão de `buildOrderRoutes`, `buildCustomerRoutes`, etc.
 
 Replay deve registrar `req.user.id` como `replayedBy` ([ADR-003](adrs/ADR-003-retry-backoff-e-dlq.md)).
 
-### 5. `src/middlewares/validate.middleware.ts` e `webhook.schemas.ts` — validação
+### 5. `src/middlewares/validate.middleware.ts` + `webhook.schemas.ts` (**Existente** + **A criar**)
 
-**Estado atual:** `validate({ body, query, params })` aplica Zod declarativamente nas rotas (padrão em todos os módulos).
+**Estado atual (existente):** `validate({ body, query, params })` em `src/middlewares/validate.middleware.ts` aplica Zod declarativamente nas rotas.
 
-**Integração:** criar `src/modules/webhooks/webhook.schemas.ts` com:
+**Integração — a criar** `src/modules/webhooks/webhook.schemas.ts` com:
 - `createWebhookSchema` — `url` deve ser `https://` (refine Zod → `WEBHOOK_INVALID_URL`)
 - `updateWebhookSchema`, `listWebhooksQuerySchema`
 - `subscribedStatuses` como array de `OrderStatus` enum
 
-Registrar nas rotas: `validate({ body: createWebhookSchema })` — mesmo padrão de `order.schemas.ts`.
+Registrar nas rotas webhooks (**a criar**): `validate({ body: createWebhookSchema })` — mesmo padrão de `src/modules/orders/order.schemas.ts` (existente).
 
-### 6. `src/shared/errors/http-errors.ts` — erros tipados
+### 6. `src/shared/errors/http-errors.ts` — erros tipados (**Alterar**)
 
-**Estado atual:** hierarquia `AppError` com `statusCode`, `errorCode`, `details`; classes como `InvalidStatusTransitionError`, `InsufficientStockError`.
+**Estado atual (existente):** hierarquia `AppError` com `statusCode`, `errorCode`, `details`; classes como `InvalidStatusTransitionError`, `InsufficientStockError`.
 
-**Integração:** adicionar classes `Webhook*` com `errorCode` prefixado `WEBHOOK_`. Exportar em `src/shared/errors/index.ts`. O `errorMiddleware` serializa automaticamente:
+**Integração:** adicionar classes `Webhook*` (**a criar** neste arquivo) com `errorCode` prefixado `WEBHOOK_`. Exportar em `src/shared/errors/index.ts` (**alterar**). O `errorMiddleware` em `src/middlewares/error.middleware.ts` (existente) serializa automaticamente:
 
 ```json
 { "error": { "code": "WEBHOOK_INVALID_URL", "message": "...", "details": {} } }
 ```
 
-### 7. `prisma/schema.prisma` — modelos de dados
+### 7. `prisma/schema.prisma` — modelos de dados (**Alterar**)
 
-**Estado atual:** enums `UserRole`, `OrderStatus`; modelos `Order`, `OrderStatusHistory`, etc. com UUID `CHAR(36)`.
+**Estado atual (existente):** enums `UserRole`, `OrderStatus`; modelos `Order`, `OrderStatusHistory`, etc. com UUID `CHAR(36)`.
 
-**Integração:** adicionar modelos (nomes sugeridos):
+**Integração — modelos a adicionar:**
 
 | Modelo | Propósito |
 |--------|-----------|
@@ -578,48 +581,60 @@ Registrar nas rotas: `validate({ body: createWebhookSchema })` — mesmo padrão
 
 Rodar `npm run db:migrate`. Secrets armazenadas hasheadas (nunca plain text no banco).
 
-### 8. `src/worker.ts` — processo separado
+### 8. `src/worker.ts` — processo separado (**A criar**)
 
-**Estado atual:** não existe; API inicia em `src/server.ts` com graceful shutdown.
+**Estado atual:** arquivo **não existe**; API inicia em `src/server.ts` (existente) com graceful shutdown.
 
-**Integração:** novo entry point espelhando bootstrap de `server.ts`:
+**Integração — a criar** entry point espelhando bootstrap de `src/server.ts`:
 - Conectar `PrismaClient` próprio (mesma `DATABASE_URL`)
-- Instanciar `WebhookProcessor` com repository
+- Instanciar `WebhookProcessor` (**a criar** em `src/modules/webhooks/webhook.processor.ts`) com repository
 - Loop de polling 2 s com `setInterval` ou `while + sleep`
 - Graceful shutdown em `SIGINT`/`SIGTERM` (desconectar Prisma)
 
-Script em `package.json`: `"worker": "tsx --env-file=.env src/worker.ts"`
+Script **a adicionar** em `package.json` (existente): `"worker": "tsx --env-file=.env src/worker.ts"`
 
-### 9. `src/shared/logger/index.ts` — observabilidade
+### 9. `src/shared/logger/index.ts` — observabilidade (**Alterar**)
 
-**Estado atual:** Pino com redação de campos sensíveis (senhas, tokens).
+**Estado atual (existente):** Pino com redação de campos sensíveis (senhas, tokens).
 
 **Integração:** estender lista de redação para `secret`, `previousSecret`, `signature`. Worker e API usam o mesmo logger — sem dependência nova ([ADR-006](adrs/ADR-006-reuso-padroes-modulo-webhooks.md)).
 
-### 10. `tests/helpers/factories.ts` e `tests/orders.test.ts` — testes
+### 10. `tests/helpers/factories.ts` e `tests/orders.test.ts` — testes (**Alterar** + **A criar**)
 
-**Estado atual:** `getTestApp()`, `bootstrapAuthenticatedUser()`, `createTestCustomer()`, `createTestProduct()`; `orders.test.ts` cobre transições e estoque.
+**Estado atual (existente):** `getTestApp()`, `bootstrapAuthenticatedUser()`, `createTestCustomer()`, `createTestProduct()` em `tests/helpers/factories.ts`; `tests/orders.test.ts` cobre transições e estoque.
 
 **Integração:**
-- Adicionar `createTestWebhook(customerId, statuses)` em factories
-- Novo arquivo `tests/webhooks.test.ts` — CRUD, outbox transacional, HMAC, retry, DLQ, replay
-- Estender `orders.test.ts`: após `PATCH /orders/:id/status`, assert `webhook_outbox` contém linha com snapshot correto
+- **Alterar** `tests/helpers/factories.ts`: adicionar `createTestWebhook(customerId, statuses)`
+- **A criar** `tests/webhooks.test.ts` — CRUD, outbox transacional, HMAC, retry, DLQ, replay
+- **Alterar** `tests/orders.test.ts`: após `PATCH /orders/:id/status`, assert `webhook_outbox` contém linha com snapshot correto
 
 ---
 
 **Mapa resumido de arquivos tocados:**
 
-| Arquivo | Tipo de alteração |
-|---------|-------------------|
-| `src/modules/orders/order.service.ts` | Modificar — hook transacional |
-| `src/modules/orders/order.status.ts` | Somente leitura — define gatilhos |
-| `src/app.ts` | Modificar — wiring webhook |
-| `src/routes/index.ts` | Modificar — rotas webhook |
-| `src/middlewares/auth.middleware.ts` | Reutilizar — sem alteração |
-| `src/middlewares/validate.middleware.ts` | Reutilizar — sem alteração |
-| `src/shared/errors/http-errors.ts` | Modificar — novas classes |
-| `prisma/schema.prisma` | Modificar — novos modelos |
-| `src/worker.ts` | Criar — entry point worker |
-| `src/modules/webhooks/*` | Criar — módulo completo |
-| `package.json` | Modificar — script `worker` |
-| `tests/webhooks.test.ts` | Criar — testes integração |
+| Arquivo | Status no repo | Tipo de alteração |
+|---------|----------------|-------------------|
+| `src/modules/orders/order.service.ts` | Existente | Alterar — hook transacional |
+| `src/modules/orders/order.status.ts` | Existente | Somente leitura — define gatilhos |
+| `src/modules/orders/order.routes.ts` | Existente | Somente leitura — contrato HTTP inalterado |
+| `src/app.ts` | Existente | Alterar — wiring webhook |
+| `src/routes/index.ts` | Existente | Alterar — rotas webhook |
+| `src/middlewares/auth.middleware.ts` | Existente | Reutilizar — sem alteração |
+| `src/middlewares/validate.middleware.ts` | Existente | Reutilizar — sem alteração |
+| `src/middlewares/error.middleware.ts` | Existente | Reutilizar — sem alteração |
+| `src/shared/errors/http-errors.ts` | Existente | Alterar — classes `Webhook*` |
+| `src/shared/errors/index.ts` | Existente | Alterar — exports |
+| `src/shared/logger/index.ts` | Existente | Alterar — redação de secrets |
+| `prisma/schema.prisma` | Existente | Alterar — novos modelos |
+| `package.json` | Existente | Alterar — script `worker` |
+| `tests/helpers/factories.ts` | Existente | Alterar — `createTestWebhook()` |
+| `tests/orders.test.ts` | Existente | Alterar — assert na outbox |
+| `src/worker.ts` | **A criar** | Entry point worker |
+| `src/modules/webhooks/webhook.publisher.ts` | **A criar** | `publishWebhookEvent()` |
+| `src/modules/webhooks/webhook.processor.ts` | **A criar** | Loop de polling e entrega HTTP |
+| `src/modules/webhooks/webhook.routes.ts` | **A criar** | `buildWebhookRouter`, `buildAdminWebhookRouter` |
+| `src/modules/webhooks/webhook.controller.ts` | **A criar** | Handlers HTTP |
+| `src/modules/webhooks/webhook.service.ts` | **A criar** | Regras de negócio |
+| `src/modules/webhooks/webhook.repository.ts` | **A criar** | Acesso Prisma |
+| `src/modules/webhooks/webhook.schemas.ts` | **A criar** | Schemas Zod |
+| `tests/webhooks.test.ts` | **A criar** | Testes de integração |
